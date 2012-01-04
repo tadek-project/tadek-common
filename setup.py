@@ -7,7 +7,7 @@
 ## TADEK - Test Automation in a Distributed Environment                       ##
 ## (http://tadek.comarch.com)                                                 ##
 ##                                                                            ##
-## Copyright (C) 2011 Comarch S.A.                                            ##
+## Copyright (C) 2011,2012 Comarch S.A.                                       ##
 ## All rights reserved.                                                       ##
 ##                                                                            ##
 ## TADEK is free software for non-commercial purposes. For commercial ones    ##
@@ -41,7 +41,6 @@ from glob import glob
 from subprocess import check_call
 from distutils.command.build import build as _build
 from distutils.command.clean import clean as _clean
-from distutils.command.install import install as _install
 from distutils.core import Distribution as _Distribution
 from distutils.core import setup
 from distutils.dir_util import remove_tree
@@ -49,13 +48,11 @@ from distutils import log
 
 from tadek.core.config import CONF_DIR, DATA_DIR, DOC_DIR, VERSION
 
+BUILD_HTML_DIR = os.path.join("build", "html")
 HTML_DOC_DIR = os.path.join(DOC_DIR, "api", "html")
 
-DATA_FILES = []
-
 PACKAGES = []
-
-BUILD_OUTPUT_DIR = os.path.join('build', 'html')
+DATA_FILES = []
 
 class Distribution(_Distribution):
     _Distribution.global_options.extend([
@@ -63,7 +60,7 @@ class Distribution(_Distribution):
          "don't build and install API documentation"),
         ("only-doc", None,
          "build and install only API documentation"),
-        ])
+    ])
 
     def __init__(self, attrs=None):
         self.skip_doc = 0
@@ -75,11 +72,11 @@ class build(_build):
         if not self.distribution.only_doc:
             DATA_FILES.extend([
                 (os.path.join(CONF_DIR, "common"),
-                    glob(os.path.join("data", "config", "common", "*"))),
-                (os.path.join(DATA_DIR, "locale"),
-                    glob(os.path.join("data", "locale", "*"))),
+                    glob(os.path.join("data", "config", "common", '*'))),
+                (os.path.join(DATA_DIR, "locale"), []),
             ])
-            PACKAGES.extend(["tadek",
+            PACKAGES.extend([
+                "tadek",
                 "tadek.connection",
                 "tadek.connection.protocol",
                 "tadek.core",
@@ -88,45 +85,49 @@ class build(_build):
                 "tadek.models",
                 "tadek.teststeps",
                 "tadek.testcases",
-                  "tadek.testsuites"
-                ])
+                "tadek.testsuites"
+            ])
         _build.run(self)
-        if not self.distribution.skip_doc and not os.path.exists(BUILD_OUTPUT_DIR):
-            os.makedirs(BUILD_OUTPUT_DIR)
-            EPYDOC = ['epydoc',
-                '--html', '--docformat=reStructuredText',
-                '--inheritance=grouped',
-                '--no-private',
-                '--show-imports',
-                '--redundant-details',
-                '--graph=umlclasstree',
-                '--css='+os.path.join('doc', 'tadek.css'),
-                '--output='+BUILD_OUTPUT_DIR,
-                '--no-sourcecode',
-                'tadek']
-            check_call(EPYDOC)
-
-class install(_install):
-    def run(self):
         if not self.distribution.skip_doc:
-            DATA_FILES.append((HTML_DOC_DIR, glob(os.path.join("build", "html", "*"))))
-        _install.run(self)
+            if not os.path.exists(BUILD_HTML_DIR):
+                os.makedirs(BUILD_HTML_DIR)
+                EPYDOC = ["epydoc",
+                    "--html", "--docformat=reStructuredText",
+                    "--inheritance=grouped",
+                    "--no-private",
+                    "--show-imports",
+                    "--redundant-details",
+                    "--graph=umlclasstree",
+                    "--css=" + os.path.join("doc", "tadek.css"),
+                    "--output=" + BUILD_HTML_DIR,
+                    "--no-sourcecode",
+                    "tadek"]
+                check_call(EPYDOC)
+            DATA_FILES.append((HTML_DOC_DIR,
+                               glob(os.path.join("build", "html", '*'))))
 
 class clean(_clean):
     def run(self):
         if self.all:
-            if os.path.exists(BUILD_OUTPUT_DIR):
-                remove_tree(BUILD_OUTPUT_DIR, dry_run=self.dry_run)
+            if os.path.exists(BUILD_HTML_DIR):
+                remove_tree(BUILD_HTML_DIR, dry_run=self.dry_run)
             else:
                 log.warn("'%s' does not exist -- can't clean it",
-                    BUILD_OUTPUT_DIR)
+                         BUILD_HTML_DIR)
         _clean.run(self)
 
 setup(
-    distclass=Distribution,
-    cmdclass={'build': build, 'install': install, 'clean': clean},
     name="tadek-common",
     version=VERSION,
+    description="TADEK is a distributed environment for test automation",
+    long_description=''.join(['\n', open("README").read()]),
+    author="Comarch TADEK Team",
+    author_email="tadek@comarch.com",
+    license="http://tadek.comarch.com/licensing",
+    url="http://tadek.comarch.com/",
+    distclass=Distribution,
+    cmdclass={"build": build, "clean": clean},
     packages=PACKAGES,
     data_files=DATA_FILES,
 )
+
