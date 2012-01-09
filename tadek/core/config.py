@@ -46,9 +46,6 @@ NAME = "tadek"
 # The version number
 VERSION = "1.0.0"
 
-# The version string
-VERSION_STRING = "%%prog (TADEK) version %s" % VERSION
-
 # A directory with project data
 DATA_DIR = "data"
 
@@ -111,6 +108,22 @@ def setProgramName(name):
     _programName = name
     _configDirs = None
     reload()
+
+# A current run program version
+_programVersion = "%s (%s) version: %s"
+
+def getProgramVersion(program=''):
+    '''
+    Gets a version of the current program.
+
+    :param program: A name of the program
+    :type program: string
+    :return: A version of the current program
+    :rtype: string
+    '''
+    if not program:
+        program = getProgramName() or ''
+    return _programVersion % (program, NAME.upper(), VERSION)
 
 
 class Config(object):
