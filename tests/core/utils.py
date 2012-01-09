@@ -64,7 +64,7 @@ class TimeFunctTest(unittest.TestCase):
         self.assertEqual("", timeToString(None))
 
     def testtimeFromString(self):
-        dateTimeStr = "2010-12-11 16:45:08"
+        dateTimeStr = "2011-12-21 16:45:08"
         self.assertEqual(datetime.datetime.strptime(dateTimeStr,
                     _TIME_DATE_SEPARATOR.join((_DATE_FORMAT, _TIME_FORMAT))),
                                                 timeFromString(dateTimeStr))
@@ -73,26 +73,24 @@ class TimeFunctTest(unittest.TestCase):
         self.assertEqual(None, timeFromString(""))
 
     def testSanity(self):
-        dateTimeStr = "2010-12-11 16:45:08"
+        dateTimeStr = "2011-12-21 16:45:08"
         self.assertEqual(dateTimeStr, timeToString(timeFromString(dateTimeStr)))
 
     def testRunTimeToString(self):
         seconds = 8642.10982
-        self.assertEqual("2h 24m 2s", runTimeToString(seconds))
+        self.assertEqual("2h 24m 2.11s", runTimeToString(seconds))
 
     def testRunTimeToStringNoHours(self):
-        seconds = 1444.12982
-        self.assertEqual("24m 4s", runTimeToString(seconds))
+        seconds = 1444.37982
+        self.assertEqual("24m 4.38s", runTimeToString(seconds))
 
     def testRunTimeToStringSecondsOnly(self):
         seconds = 46.99982
-        self.assertEqual("46s", runTimeToString(seconds))
+        self.assertEqual("47.00s", runTimeToString(seconds))
 
     def testRunTimeToStringMoreThan24h(self):
-        seconds = 398770.112366
-        self.assertEqual("110h 46m 10s", runTimeToString(seconds))
-
-
+        seconds = 398770.412366
+        self.assertEqual("110h 46m 10.41s", runTimeToString(seconds))
 
 if __name__ == "__main__":
     unittest.main()
