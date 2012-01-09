@@ -5,7 +5,7 @@
 ## TADEK - Test Automation in a Distributed Environment                       ##
 ## (http://tadek.comarch.com)                                                 ##
 ##                                                                            ##
-## Copyright (C) 2011 Comarch S.A.                                            ##
+## Copyright (C) 2011,2012 Comarch S.A.                                       ##
 ## All rights reserved.                                                       ##
 ##                                                                            ##
 ## TADEK is free software for non-commercial purposes. For commercial ones    ##
@@ -38,7 +38,7 @@ import os
 import shutil
 import ConfigParser
 
-import tadek
+#import tadek
 
 # The project name
 NAME = "tadek"
@@ -59,13 +59,9 @@ if os.path.isdir(os.path.join(os.path.pardir, DATA_DIR)):
     DOC_DIR = os.path.join(DATA_DIR, "doc")
 elif os.name == "nt":
     # Windows
-    _dir = os.path.dirname(os.path.dirname(tadek.__file__))
-    if not os.path.isdir(os.path.join(_dir, DATA_DIR)):
-        _dir = os.path.dirname(_dir)
-    DATA_DIR = os.path.abspath(os.path.join(_dir, DATA_DIR))
+    DATA_DIR = os.path.join(os.getenv("PROGRAMFILES", ''), NAME.upper())
     CONF_DIR = os.path.join(DATA_DIR, "config")
     DOC_DIR = os.path.join(DATA_DIR, "doc")
-    del _dir
 elif os.name == "posix":
     # POSIX
     DATA_DIR = os.path.join("/usr/share", NAME)
