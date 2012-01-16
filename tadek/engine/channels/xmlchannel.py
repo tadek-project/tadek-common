@@ -274,14 +274,14 @@ class XmlChannel(channels.TestResultFileChannel):
         status = element.findtext("status")
         if status is None:
             raise XmlMissingTagError(element.tag, "status")
-        device = _Device()
-        device.name = name
+        d = _Device()
+        d.name = name
         port = element.findtext("port")
         if port:
             port = int(port)
-        device.address = (element.findtext("address"), port)
-        device.description = element.findtext("description")
-        device = result.device(device)
+        d.address = (element.findtext("address"), port)
+        d.description = element.findtext("description")
+        device = result.device(d)
         device.status = status
         date = element.findtext("date")
         if date:
@@ -304,6 +304,7 @@ class XmlChannel(channels.TestResultFileChannel):
                 mtime = mtime and utils.timeStampFromString(mtime)
                 size = long(core.findtext("size") or 0)
                 device.cores.append(FileDetails(path, mtime=mtime, size=size))
+        return d
 
     def _readResultElement(self, element, parent):
         '''
@@ -330,8 +331,10 @@ class XmlChannel(channels.TestResultFileChannel):
         if attrs is not None:
             for attr in list(attrs):
                 result.attrs[attr.tag] = attr.text
-        for device in devices.findall("device"):
-            self._readDeviceElement(device, result)
+        # Make sure that device objects are _not_ destroyed till
+        # the for loop is running
+        [self._readDeviceElement(device, result)
+            for device in devices.findall("device")]
         return result
 
     def _readStepElement(self, element, parent):
