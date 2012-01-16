@@ -36,7 +36,6 @@
 
 from xml.etree import cElementTree as etree
 
-from tadek.core import settings
 from tadek.core import utils
 from tadek.core.structs import FileDetails
 from tadek.engine import channels
