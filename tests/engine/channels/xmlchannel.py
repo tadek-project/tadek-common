@@ -36,69 +36,22 @@
 
 import os
 import time
-import difflib
 import unittest
 import datetime
-import tempfile
 import cStringIO
 
 from tadek.core import utils
-from tadek.core.config import Config
 from tadek.core.structs import FileDetails
 from tadek.engine import channels
 from tadek.engine import testexec
 from tadek.engine import testresult
 from tadek.engine.channels.xmlchannel import XmlChannel
 
+import helpers
 from engine.commons import FakeDevice
 
 __all__ = ["XmlChannelTest", "XmlChannelTestVerbose", "XmlChannelTestRead",
            "XmlChannelTestAsymmetric", "XmlChannelTestErrorsCores"]
-
-_PATH = os.path.abspath(os.path.curdir)
-_STEP_FUNC = "tadek.teststeps.tests.stepFunc"
-
-
-def _assertXML(expected, current):
-    if expected != current:
-        assert False, '\n'+''.join(difflib.unified_diff(expected.splitlines(1),
-                                                        current.splitlines(1)))
-    
-def _stepResult(name="Step", parent=None):
-    attrs = {
-        "description": "Description of test step: %s" % name
-    }
-    args = {
-        "kwarg": "Argument of test step: %s" % name
-    }
-    return testresult.TestStepResult(id=name, path=_PATH, func=_STEP_FUNC,
-                                     parent=parent, attrs=attrs, args=args)
-
-def _caseResult(name="Case", parent=None):
-    attrs = {
-        "description": "Description of test case: %s" % name
-    }
-    return testresult.TestCaseResult(id=name, path=_PATH,
-                                     parent=parent, attrs=attrs)
-
-def _suiteResult(name="Suite", parent=None):
-    attrs = {
-        "description": "Description of test suite: %s" % name
-    }
-    return testresult.TestSuiteResult(id=name, path=_PATH,
-                                      parent=parent, attrs=attrs)
-
-def _structResult(nsuites=0, ncases=0, nsteps=0):
-    suites = [_suiteResult("Suite%d" % (i + 1)) for i in xrange(nsuites)]
-    if nsuites:
-        cases = [_caseResult("Case%d" % (i + 1), suite) for i in xrange(ncases)
-                                                        for suite in suites]
-    else:
-        cases = [_caseResult("Case%d" % (i + 1)) for i in xrange(ncases)]
-    steps = [_stepResult("Step%d" % (i + 1), case) for i in xrange(nsteps)
-                                                   for case in cases]
-    return suites, cases, steps
-
 
 class TestXmlChannel(XmlChannel):
     def write(self):
@@ -110,9 +63,7 @@ class TestXmlChannel(XmlChannel):
 
 class XmlChannelTest(unittest.TestCase):
     def setUp(self):
-        self.device = testresult.DeviceExecResult(FakeDevice("Device"))
-        self.device.date = datetime.datetime.now()
-        self.device.status = testexec.STATUS_NOT_COMPLETED
+        self.device = helpers.deviceResult()
 
     def testStartStop(self):
         expectedXML = ''
@@ -120,7 +71,7 @@ class XmlChannelTest(unittest.TestCase):
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         channel.start(None)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestStep(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -139,7 +90,7 @@ class XmlChannelTest(unittest.TestCase):
     </step>
 </results>
 '''
-        result = _stepResult()
+        result = helpers.stepResult()
         string = cStringIO.StringIO()
         expectedXML %= (result.id, result.path, result.func,
                         self.device.name, self.device.status)
@@ -149,7 +100,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.startTest(result, self.device)
         self.failUnless(channel.isActive())
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTestStep(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -169,7 +120,7 @@ class XmlChannelTest(unittest.TestCase):
     </step>
 </results>
 '''
-        result = _stepResult()
+        result = helpers.stepResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         channel.start(None)
@@ -181,7 +132,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.stop()
         expectedXML %= (result.id, result.path, result.func,
                         self.device.name, self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestStep(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -201,7 +152,7 @@ class XmlChannelTest(unittest.TestCase):
     </step>
 </results>
 '''
-        result = _stepResult()
+        result = helpers.stepResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         self.failIf(channel.isActive())
@@ -214,7 +165,7 @@ class XmlChannelTest(unittest.TestCase):
         self.failUnless(channel.isActive())
         expectedXML %= (result.id, result.path, result.func,
                         self.device.name, self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestCase(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -232,7 +183,7 @@ class XmlChannelTest(unittest.TestCase):
     </case>
 </results>
 '''
-        result = _caseResult()
+        result = helpers.caseResult()
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status)
         string = cStringIO.StringIO()
@@ -242,7 +193,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.startTest(result, self.device)
         self.failUnless(channel.isActive())
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTestCase(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -261,7 +212,7 @@ class XmlChannelTest(unittest.TestCase):
     </case>
 </results>
 '''
-        result = _caseResult()
+        result = helpers.caseResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         channel.start(None)
@@ -273,7 +224,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.stop()
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestCase(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -292,7 +243,7 @@ class XmlChannelTest(unittest.TestCase):
     </case>
 </results>
 '''
-        result = _caseResult()
+        result = helpers.caseResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         self.failIf(channel.isActive())
@@ -305,7 +256,7 @@ class XmlChannelTest(unittest.TestCase):
         self.failUnless(channel.isActive())
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestSuite(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -323,7 +274,7 @@ class XmlChannelTest(unittest.TestCase):
     </suite>
 </results>
 '''
-        result = _suiteResult()
+        result = helpers.suiteResult()
         string = cStringIO.StringIO()
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status)
@@ -333,7 +284,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.startTest(result, self.device)
         self.failUnless(channel.isActive())
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTestSuite(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -352,7 +303,7 @@ class XmlChannelTest(unittest.TestCase):
     </suite>
 </results>
 '''
-        result = _suiteResult()
+        result = helpers.suiteResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         channel.start(None)
@@ -364,7 +315,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.stop()
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestSuite(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -383,7 +334,7 @@ class XmlChannelTest(unittest.TestCase):
     </suite>
 </results>
 '''
-        result = _suiteResult()
+        result = helpers.suiteResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         self.failIf(channel.isActive())
@@ -396,7 +347,7 @@ class XmlChannelTest(unittest.TestCase):
         self.failUnless(channel.isActive())
         expectedXML %= (result.id, result.path, self.device.name,
                         self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest1Suite1Case(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -427,7 +378,7 @@ class XmlChannelTest(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1)
+        suites, cases, steps = helpers.structResult(1, 1)
         suite, case = suites[0], cases[0]
         expectedXML %= (suite.id, suite.path, self.device.name,
                         self.device.status, case.id, case.path,
@@ -437,7 +388,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.startTest(suite, self.device)
         channel.startTest(case, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest1Suite1Case(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -470,7 +421,7 @@ class XmlChannelTest(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1)
+        suites, cases, steps = helpers.structResult(1, 1)
         suite, case = suites[0], cases[0]
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         channel.start(None)
@@ -485,7 +436,7 @@ class XmlChannelTest(unittest.TestCase):
                         self.device.status, self.device.time,
                         case.id, case.path, self.device.name,
                         self.device.status, self.device.time)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest1Suite3Cases_3Devices(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -552,20 +503,14 @@ class XmlChannelTest(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 3)
+        suites, cases, steps = helpers.structResult(1, 3)
         suite, case1, case2, case3 = suites[0], cases[0], cases[1], cases[2]
-        device1 = testresult.DeviceExecResult(FakeDevice("Device1"))
-        device1.date = datetime.datetime.now()
-        device1.status = testexec.STATUS_PASSED
-        device1.time = 3.125
-        device2 = testresult.DeviceExecResult(FakeDevice("Device2"))
-        device2.date = datetime.datetime.now()
-        device2.status = testexec.STATUS_FAILED
-        device2.time = 2.25
-        device3 = testresult.DeviceExecResult(FakeDevice("Device3"))
-        device3.date = datetime.datetime.now()
-        device3.status = testexec.STATUS_ERROR
-        device3.time = 1.875
+        device1 = helpers.deviceResult("Device1", time=3.125,
+                                       status=testexec.STATUS_PASSED)
+        device2 = helpers.deviceResult("Device2", time=2.25,
+                                       status=testexec.STATUS_FAILED)
+        device3 = helpers.deviceResult("Device3", time=1.875,
+                                       status=testexec.STATUS_ERROR)
         expectedXML %= (suite.id, suite.path,
                         device1.name, device1.status, device1.time,
                         device2.name, device2.status, device2.time,
@@ -591,7 +536,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.stopTest(case2, device2)
         channel.stopTest(suite, device2)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest1Suite1Case1Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -635,7 +580,7 @@ class XmlChannelTest(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
@@ -650,7 +595,7 @@ class XmlChannelTest(unittest.TestCase):
         channel.startTest(case, self.device)
         channel.startTest(step, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest2Suites2Cases2Steps(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -840,7 +785,7 @@ class XmlChannelTest(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(2, 2, 2)
+        suites, cases, steps = helpers.structResult(2, 2, 2)
         suite1, suite2 = suites
         case11, case21, case12, case22 = cases
         step111,step211,step121,step221, step112,step212,step122,step222 = steps
@@ -904,16 +849,12 @@ class XmlChannelTest(unittest.TestCase):
             "deviceStatus": self.device.status,
             "deviceTime": self.device.time,
         }
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
 
 class XmlChannelTestVerbose(unittest.TestCase):
     def setUp(self):
-        device = FakeDevice("Device")
-        device.description = "Description of the device"
-        self.device = testresult.DeviceExecResult(device)
-        self.device.date = datetime.datetime.now()
-        self.device.status = testexec.STATUS_NOT_COMPLETED
+        self.device = helpers.deviceResult()
 
     def testStartTestStep(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -923,10 +864,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <path>%s</path>
         <function>%s</function>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <arguments>
-            <kwarg>%s</kwarg>
+            <arg1>%s</arg1>
+            <arg2>%s</arg2>
         </arguments>
         <devices>
             <device>
@@ -942,10 +885,11 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </step>
 </results>
 '''
-        result = _stepResult()
+        result = helpers.stepResult()
         string = cStringIO.StringIO()
         expectedXML %= (result.id, result.path, result.func,
-                        result.attrs["description"], result.args["kwarg"],
+                        result.attrs["name"], result.attrs["description"],
+                        result.args["arg1"], result.args["arg2"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date),
                         self.device.address, self.device.port,
@@ -954,7 +898,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.start(None)
         channel.startTest(result, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestStep(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -964,10 +908,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <path>%s</path>
         <function>%s</function>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <arguments>
-            <kwarg>%s</kwarg>
+            <arg1>%s</arg1>
+            <arg2>%s</arg2>
         </arguments>
         <devices>
             <device>
@@ -984,7 +930,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </step>
 </results>
 '''
-        result = _stepResult()
+        result = helpers.stepResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=True)
         channel.start(None)
@@ -994,12 +940,13 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.stopTest(result, self.device)
         channel.stop()
         expectedXML %= (result.id, result.path, result.func,
-                        result.attrs["description"], result.args["kwarg"],
+                        result.attrs["name"], result.attrs["description"],
+                        result.args["arg1"], result.args["arg2"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date), self.device.time,
                         self.device.address, self.device.port,
                         self.device.description)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestCase(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1008,6 +955,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%s</id>
         <path>%s</path>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <devices>
@@ -1024,8 +972,9 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </case>
 </results>
 '''
-        result = _caseResult()
-        expectedXML %= (result.id, result.path, result.attrs["description"],
+        result = helpers.caseResult()
+        expectedXML %= (result.id, result.path,
+                        result.attrs["name"], result.attrs["description"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date),
                         self.device.address, self.device.port,
@@ -1035,7 +984,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.start(None)
         channel.startTest(result, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestCase(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1044,6 +993,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%s</id>
         <path>%s</path>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <devices>
@@ -1061,7 +1011,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </case>
 </results>
 '''
-        result = _caseResult()
+        result = helpers.caseResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=True)
         channel.start(None)
@@ -1070,12 +1020,13 @@ class XmlChannelTestVerbose(unittest.TestCase):
         self.device.status = testexec.STATUS_ERROR
         channel.stopTest(result, self.device)
         channel.stop()
-        expectedXML %= (result.id, result.path, result.attrs["description"],
+        expectedXML %= (result.id, result.path,
+                        result.attrs["name"], result.attrs["description"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date), self.device.time,
                         self.device.address, self.device.port,
                         self.device.description)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestSuite(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1084,6 +1035,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%s</id>
         <path>%s</path>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <devices>
@@ -1100,9 +1052,10 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </suite>
 </results>
 '''
-        result = _suiteResult()
+        result = helpers.suiteResult()
         string = cStringIO.StringIO()
-        expectedXML %= (result.id, result.path, result.attrs["description"],
+        expectedXML %= (result.id, result.path,
+                        result.attrs["name"], result.attrs["description"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date),
                         self.device.address, self.device.port,
@@ -1111,7 +1064,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.start(None)
         channel.startTest(result, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestSuite(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1120,6 +1073,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%s</id>
         <path>%s</path>
         <attributes>
+            <name>%s</name>
             <description>%s</description>
         </attributes>
         <devices>
@@ -1137,7 +1091,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
     </suite>
 </results>
 '''
-        result = _suiteResult()
+        result = helpers.suiteResult()
         string = cStringIO.StringIO()
         channel = TestXmlChannel("Test", filename=string, verbose=True)
         channel.start(None)
@@ -1146,12 +1100,13 @@ class XmlChannelTestVerbose(unittest.TestCase):
         self.device.status = testexec.STATUS_PASSED
         channel.stopTest(result, self.device)
         channel.stop()
-        expectedXML %= (result.id, result.path, result.attrs["description"],
+        expectedXML %= (result.id, result.path,
+                        result.attrs["name"], result.attrs["description"],
                         self.device.name, self.device.status,
                         utils.timeToString(self.device.date), self.device.time,
                         self.device.address, self.device.port,
                         self.device.description)
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest1Suite1Case1Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1160,6 +1115,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%(suiteId)s</id>
         <path>%(suitePath)s</path>
         <attributes>
+            <name>%(suiteName)s</name>
             <description>%(suiteDesc)s</description>
         </attributes>
         <devices>
@@ -1177,6 +1133,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
                 <id>%(caseId)s</id>
                 <path>%(casePath)s</path>
                 <attributes>
+                    <name>%(caseName)s</name>
                     <description>%(caseDesc)s</description>
                 </attributes>
                 <devices>
@@ -1195,10 +1152,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
                         <path>%(stepPath)s</path>
                         <function>%(stepFunc)s</function>
                         <attributes>
+                            <name>%(stepName)s</name>
                             <description>%(stepDesc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(stepArg)s</kwarg>
+                            <arg1>%(stepArg1)s</arg1>
+                            <arg2>%(stepArg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -1220,15 +1179,19 @@ class XmlChannelTestVerbose(unittest.TestCase):
 '''
         device = self.device
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
+            "suiteName": suite.attrs["name"],
             "suiteDesc": suite.attrs["description"],
             "caseId": case.id, "casePath": case.path,
+            "caseName": case.attrs["name"],
             "caseDesc": case.attrs["description"],
             "stepId": step.id, "stepPath": step.path, "stepFunc": step.func,
-            "stepDesc": step.attrs["description"],"stepArg": step.args["kwarg"],
+            "stepName": step.attrs["name"],
+            "stepDesc": step.attrs["description"],
+            "stepArg1": step.args["arg1"], "stepArg2": step.args["arg2"],
             "deviceName": device.name, "deviceStatus": device.status,
             "deviceDate": utils.timeToString(device.date),
             "deviceAddr": device.address, "devicePort": device.port,
@@ -1240,7 +1203,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.startTest(case, self.device)
         channel.startTest(step, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest1Suite1Case1Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1249,6 +1212,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%(suiteId)s</id>
         <path>%(suitePath)s</path>
         <attributes>
+            <name>%(suiteName)s</name>
             <description>%(suiteDesc)s</description>
         </attributes>
         <devices>
@@ -1267,6 +1231,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
                 <id>%(caseId)s</id>
                 <path>%(casePath)s</path>
                 <attributes>
+                    <name>%(caseName)s</name>
                     <description>%(caseDesc)s</description>
                 </attributes>
                 <devices>
@@ -1286,10 +1251,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
                         <path>%(stepPath)s</path>
                         <function>%(stepFunc)s</function>
                         <attributes>
+                            <name>%(stepName)s</name>
                             <description>%(stepDesc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(stepArg)s</kwarg>
+                            <arg1>%(stepArg1)s</arg1>
+                            <arg2>%(stepArg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -1312,7 +1279,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
 '''
         device = self.device
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         channel = TestXmlChannel("Test", filename=string, verbose=True)
         channel.start(None)
@@ -1327,17 +1294,21 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.stop()
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
+            "suiteName": suite.attrs["name"],
             "suiteDesc": suite.attrs["description"],
             "caseId": case.id, "casePath": case.path,
+            "caseName": case.attrs["name"],
             "caseDesc": case.attrs["description"],
             "stepId": step.id, "stepPath": step.path, "stepFunc": step.func,
-            "stepDesc": step.attrs["description"],"stepArg": step.args["kwarg"],
+            "stepName": step.attrs["name"],
+            "stepDesc": step.attrs["description"],
+            "stepArg1": step.args["arg1"], "stepArg2": step.args["arg2"],
             "deviceName": device.name, "deviceStatus": device.status,
             "deviceDate": utils.timeToString(device.date),
             "deviceAddr": device.address, "devicePort": device.port,
             "deviceDesc": device.description, "deviceTime": device.time
         }
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest1Suite1Case1Step_NoAttrsNoArgs(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1400,7 +1371,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         suite.attrs = case.attrs = step.attrs = step.args = {}
         self.device.description = None
@@ -1424,7 +1395,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
             "deviceAddr": self.device.address, "devicePort": self.device.port,
             "deviceTime": self.device.time
         }
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTest1Suite3Cases3Steps_3Devices(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1433,6 +1404,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
         <id>%(suiteId)s</id>
         <path>%(suitePath)s</path>
         <attributes>
+            <name>%(suiteName)s</name>
             <description>%(suiteDesc)s</description>
         </attributes>
         <devices>
@@ -1469,6 +1441,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
                 <id>%(case1Id)s</id>
                 <path>%(case1Path)s</path>
                 <attributes>
+                    <name>%(case1Name)s</name>
                     <description>%(case1Desc)s</description>
                 </attributes>
                 <devices>
@@ -1488,10 +1461,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
                         <path>%(step1Path)s</path>
                         <function>%(step1Func)s</function>
                         <attributes>
+                            <name>%(step1Name)s</name>
                             <description>%(step1Desc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(step1Arg)s</kwarg>
+                            <arg1>%(step1Arg1)s</arg1>
+                            <arg2>%(step1Arg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -1512,6 +1487,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
                 <id>%(case2Id)s</id>
                 <path>%(case2Path)s</path>
                 <attributes>
+                    <name>%(case2Name)s</name>
                     <description>%(case2Desc)s</description>
                 </attributes>
                 <devices>
@@ -1531,10 +1507,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
                         <path>%(step2Path)s</path>
                         <function>%(step2Func)s</function>
                         <attributes>
+                            <name>%(step2Name)s</name>
                             <description>%(step2Desc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(step2Arg)s</kwarg>
+                            <arg1>%(step2Arg1)s</arg1>
+                            <arg2>%(step2Arg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -1555,6 +1533,7 @@ class XmlChannelTestVerbose(unittest.TestCase):
                 <id>%(case3Id)s</id>
                 <path>%(case3Path)s</path>
                 <attributes>
+                    <name>%(case3Name)s</name>
                     <description>%(case3Desc)s</description>
                 </attributes>
                 <devices>
@@ -1574,10 +1553,12 @@ class XmlChannelTestVerbose(unittest.TestCase):
                         <path>%(step3Path)s</path>
                         <function>%(step3Func)s</function>
                         <attributes>
+                            <name>%(step3Name)s</name>
                             <description>%(step3Desc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(step3Arg)s</kwarg>
+                            <arg1>%(step3Arg1)s</arg1>
+                            <arg2>%(step3Arg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -1600,46 +1581,44 @@ class XmlChannelTestVerbose(unittest.TestCase):
 '''
         device = self.device
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 3, 1)
+        suites, cases, steps = helpers.structResult(1, 3, 1)
         suite = suites[0]
         case1, case2, case3 = cases
         step1, step2, step3 = steps
-        device1 = testresult.DeviceExecResult(FakeDevice("Device1"))
-        device1.address = "192.168.1.101"
-        device1.port = 10001
-        device1.description = "Description of the device1"
-        device1.date = datetime.datetime.now()
-        device1.status = testexec.STATUS_PASSED
-        device1.time = 3.125
-        device2 = testresult.DeviceExecResult(FakeDevice("Device2"))
-        device2.address = "192.168.1.102"
-        device2.port = 10002
-        device2.description = "Description of the device2"
-        device2.date = datetime.datetime.now()
-        device2.status = testexec.STATUS_FAILED
-        device2.time = 2.25
-        device3 = testresult.DeviceExecResult(FakeDevice("Device3"))
-        device3.address = "192.168.1.103"
-        device3.port = 10003
-        device3.description = "Description of the device3"
-        device3.date = datetime.datetime.now()
-        device3.status = testexec.STATUS_ERROR
-        device3.time = 1.875
+        device1 = helpers.deviceResult("Device1", address="192.168.1.101",
+                                       port=10001, time=3.125,
+                                       status=testexec.STATUS_PASSED)
+        device2 = helpers.deviceResult("Device2", address="192.168.1.102",
+                                       port=10002, time=2.25,
+                                       status=testexec.STATUS_FAILED)
+        device3 = helpers.deviceResult("Device3", address="192.168.1.103",
+                                       port=10003, time=1.875,
+                                       status=testexec.STATUS_ERROR)
         expectedXML %= {
           "suiteId": suite.id, "suitePath": suite.path,
+          "suiteName": suite.attrs["name"],
           "suiteDesc": suite.attrs["description"],
           "case1Id": case1.id, "case1Path": case1.path,
+          "case1Name": case1.attrs["name"],
           "case1Desc": case1.attrs["description"],
           "case2Id": case2.id, "case2Path": case2.path,
+          "case2Name": case2.attrs["name"],
           "case2Desc": case2.attrs["description"],
           "case3Id": case3.id, "case3Path": case3.path,
+          "case3Name": case3.attrs["name"],
           "case3Desc": case3.attrs["description"],
           "step1Id":step1.id, "step1Path":step1.path, "step1Func":step1.func,
-          "step1Desc":step1.attrs["description"],"step1Arg":step1.args["kwarg"],
+          "step1Name": step1.attrs["name"],
+          "step1Desc": step1.attrs["description"],
+          "step1Arg1": step1.args["arg1"], "step1Arg2": step1.args["arg2"],
           "step2Id":step2.id, "step2Path":step2.path, "step2Func":step2.func,
-          "step2Desc":step2.attrs["description"],"step2Arg":step2.args["kwarg"],
-          "step3Id":step3.id, "step3Path":step3.path, "step3Func":step3.func,
-          "step3Desc":step3.attrs["description"],"step3Arg":step3.args["kwarg"],
+          "step2Name": step2.attrs["name"],
+          "step2Desc": step2.attrs["description"],
+          "step2Arg1": step2.args["arg1"], "step2Arg2": step2.args["arg2"],
+          "step3Id": step3.id, "step3Path":step3.path, "step3Func": step3.func,
+          "step3Name": step3.attrs["name"],
+          "step3Desc": step3.attrs["description"],
+          "step3Arg1":step3.args["arg1"], "step3Arg2":step3.args["arg2"],
           "device1Name": device1.name, "device1Status": device1.status,
           "device1Date": utils.timeToString(device1.date),
           "device1Addr": device1.address, "device1Port": device1.port,
@@ -1674,19 +1653,15 @@ class XmlChannelTestVerbose(unittest.TestCase):
         channel.stopTest(case2, device2)
         channel.stopTest(suite, device2)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
 
 class XmlChannelTestAsymmetric(unittest.TestCase):
     def setUp(self):
-        device = FakeDevice("Device")
-        self.deviceStart = testresult.DeviceExecResult(device)
-        self.deviceStart.date = datetime.datetime.now()
-        self.deviceStart.status = testexec.STATUS_NOT_COMPLETED
-        self.deviceStop = testresult.DeviceExecResult(device)
+        self.deviceStart = helpers.deviceResult()
+        self.deviceStop = helpers.deviceResult(time=2.875,
+                                               status=testexec.STATUS_PASSED)
         self.deviceStop.date = self.deviceStart.date
-        self.deviceStop.time = 2.875
-        self.deviceStop.status = testexec.STATUS_PASSED
 
     def testStartTestSuite_1Suite1Case(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1705,7 +1680,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1)
+        suites, cases, steps = helpers.structResult(1, 1)
         suite, case = suites[0], cases[0]
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         expectedXML %= (suite.id, suite.path,
@@ -1713,7 +1688,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.startTest(suite, self.deviceStart)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTestCase_1Suite1Case(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1740,7 +1715,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1)
+        suites, cases, steps = helpers.structResult(1, 1)
         suite, case = suites[0], cases[0]
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         expectedXML %= (suite.id, suite.path, case.id, case.path,
@@ -1749,7 +1724,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.stopTest(case, self.deviceStop)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestStep_1Suite1Case1Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1783,7 +1758,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= (suite.id, suite.path, case.id, case.path,
                         step.id, step.path, step.func,
@@ -1792,7 +1767,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.startTest(step, self.deviceStart)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTestCase_1Suite1Case2Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1834,7 +1809,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 2)
+        suites, cases, steps = helpers.structResult(1, 1, 2)
         suite, case, step1, step2 = suites[0], cases[0], steps[0], steps[1]
         expectedXML %= (suite.id, suite.path, case.id, case.path,
                         self.deviceStop.name, self.deviceStop.status,
@@ -1844,7 +1819,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.stopTest(case, self.deviceStop)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest2Step_1Suite1Case2Step(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1885,7 +1860,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 2)
+        suites, cases, steps = helpers.structResult(1, 1, 2)
         suite, case, step1, step2 = suites[0], cases[0], steps[0], steps[1]
         expectedXML %= (suite.id, suite.path, case.id, case.path,
                         step1.id, step1.path, step1.func,
@@ -1895,7 +1870,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.startTest(step2, self.deviceStart)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStopTest1Step_1Suite2Cases2Steps(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1930,7 +1905,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 2, 1)
+        suites, cases, steps = helpers.structResult(1, 2, 1)
         suite, case, step = suites[0], cases[1], steps[1]
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         expectedXML %= (suite.id, suite.path, case.id, case.path,
@@ -1940,7 +1915,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.start(None)
         channel.stopTest(step, self.deviceStop)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest1Suite1Case_StopTest1Case_1Suite2Cases(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -1972,7 +1947,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 2)
+        suites, cases, steps = helpers.structResult(1, 2)
         suite, case = suites[0], cases[0]
         channel = TestXmlChannel("Test", filename=string, verbose=False)
         expectedXML %= (suite.id, suite.path, self.deviceStart.name,
@@ -1984,7 +1959,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.startTest(case, self.deviceStart)
         channel.stopTest(case, self.deviceStop)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTest1Suite1Case1Step_StopTest1Step_1Suite1Case2Steps(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2036,7 +2011,7 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 2)
+        suites, cases, steps = helpers.structResult(1, 1, 2)
         suite, case = suites[0], cases[0]
         step1, step2 = steps
         expectedXML %= {
@@ -2056,15 +2031,14 @@ class XmlChannelTestAsymmetric(unittest.TestCase):
         channel.startTest(step1, self.deviceStart)
         channel.stopTest(step1, self.deviceStop)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
 
 class XmlChannelTestErrorsCores(unittest.TestCase):
     def setUp(self):
-        self.device = testresult.DeviceExecResult(FakeDevice("Device"))
-        self.device.date = datetime.datetime.now()
-        self.device.status = testexec.STATUS_ERROR
-        self.device.time = 3.25
+        self.device = helpers.deviceResult(time=3.25,
+                                           status=testexec.STATUS_ERROR)
+        self.device.description = None
         self.errors = [
             "Error message 1",
             "Error message 2",
@@ -2118,7 +2092,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
@@ -2133,7 +2107,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         channel.startTest(case, self.device)
         channel.startTest(step, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestErrors(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2192,7 +2166,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path, "caseId": case.id,
@@ -2214,7 +2188,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         self.device.errors.append(self.errors[2])
         channel.stopTest(suite, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartTestCores(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2258,7 +2232,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
@@ -2273,7 +2247,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         channel.startTest(case, self.device)
         channel.startTest(step, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestCores(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2344,7 +2318,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path, "caseId": case.id,
@@ -2366,7 +2340,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         self.device.cores = self.cores[:1]
         channel.stopTest(suite, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestCoresVerbose(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2375,6 +2349,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         <id>%(suiteId)s</id>
         <path>%(suitePath)s</path>
         <attributes>
+            <name>%(suiteName)s</name>
             <description>%(suiteDesc)s</description>
         </attributes>
         <devices>
@@ -2410,6 +2385,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
                 <id>%(caseId)s</id>
                 <path>%(casePath)s</path>
                 <attributes>
+                    <name>%(caseName)s</name>
                     <description>%(caseDesc)s</description>
                 </attributes>
                 <devices>
@@ -2441,10 +2417,12 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
                         <path>%(stepPath)s</path>
                         <function>%(stepFunc)s</function>
                         <attributes>
+                            <name>%(stepName)s</name>
                             <description>%(stepDesc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(stepArg)s</kwarg>
+                            <arg1>%(stepArg1)s</arg1>
+                            <arg2>%(stepArg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -2473,15 +2451,19 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
+            "suiteName": suite.attrs["name"],
             "suiteDesc": suite.attrs["description"],
             "caseId": case.id, "casePath": case.path,
+            "caseName": case.attrs["name"],
             "caseDesc": case.attrs["description"],
             "stepId": step.id, "stepPath": step.path, "stepFunc": step.func,
-            "stepDesc": step.attrs["description"],"stepArg": step.args["kwarg"],
+            "stepName": step.attrs["name"],
+            "stepDesc": step.attrs["description"],
+            "stepArg1": step.args["arg1"], "stepArg2": step.args["arg2"],
             "deviceName": self.device.name, "deviceStatus": self.device.status,
             "deviceDate": utils.timeToString(self.device.date),
             "deviceTime": self.device.time, "deviceAddr": self.device.address,
@@ -2505,7 +2487,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         self.device.cores = self.cores
         channel.stopTest(suite, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestErrorsCores(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2600,7 +2582,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path, "caseId": case.id,
@@ -2622,7 +2604,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         channel.stopTest(case, self.device)
         channel.stopTest(suite, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
     def testStartStopTestErrorsCoresVerbose(self):
         expectedXML = '''<?xml version='1.0' encoding='utf-8'?>
@@ -2631,6 +2613,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         <id>%(suiteId)s</id>
         <path>%(suitePath)s</path>
         <attributes>
+            <name>%(suiteName)s</name>
             <description>%(suiteDesc)s</description>
         </attributes>
         <devices>
@@ -2671,6 +2654,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
                 <id>%(caseId)s</id>
                 <path>%(casePath)s</path>
                 <attributes>
+                    <name>%(caseName)s</name>
                     <description>%(caseDesc)s</description>
                 </attributes>
                 <devices>
@@ -2712,10 +2696,12 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
                         <path>%(stepPath)s</path>
                         <function>%(stepFunc)s</function>
                         <attributes>
+                            <name>%(stepName)s</name>
                             <description>%(stepDesc)s</description>
                         </attributes>
                         <arguments>
-                            <kwarg>%(stepArg)s</kwarg>
+                            <arg1>%(stepArg1)s</arg1>
+                            <arg2>%(stepArg2)s</arg2>
                         </arguments>
                         <devices>
                             <device>
@@ -2759,15 +2745,19 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
 </results>
 '''
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         expectedXML %= {
             "suiteId": suite.id, "suitePath": suite.path,
+            "suiteName": suite.attrs["name"],
             "suiteDesc": suite.attrs["description"],
             "caseId": case.id, "casePath": case.path,
+            "caseName": case.attrs["name"],
             "caseDesc": case.attrs["description"],
             "stepId": step.id, "stepPath": step.path, "stepFunc": step.func,
-            "stepDesc": step.attrs["description"],"stepArg": step.args["kwarg"],
+            "stepName": step.attrs["name"],
+            "stepDesc": step.attrs["description"],
+            "stepArg1": step.args["arg1"], "stepArg2": step.args["arg2"],
             "deviceName": self.device.name, "deviceStatus": self.device.status,
             "deviceDate": utils.timeToString(self.device.date),
             "deviceTime": self.device.time, "deviceAddr": self.device.address,
@@ -2791,7 +2781,7 @@ class XmlChannelTestErrorsCores(unittest.TestCase):
         channel.stopTest(case, self.device)
         channel.stopTest(suite, self.device)
         channel.stop()
-        _assertXML(expectedXML, string.getvalue())
+        helpers.assertOutput(self, expectedXML, string)
 
 
 class XmlChannelTestRead(unittest.TestCase):
@@ -2799,15 +2789,12 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def _device(self, name="Device", description=True,
                 status=testexec.STATUS_NOT_COMPLETED, time=0.0):
-        device = testresult.DeviceExecResult(FakeDevice(name))
-        if description:
-            device.description = "Description of %s" % name
-        device.status = status
-        dt = datetime.datetime.now()
+        device = helpers.deviceResult(name, time=time, status=status)
+        if not description:
+            device.description = None
+        dt = device.date
         device.date = datetime.datetime(dt.year, dt.month, dt.day,
                                         dt.hour, dt.minute, dt.second)
-        if time:
-            device.time = time
         return device
 
     def _compareDevices(self, device1, device2):
@@ -2825,6 +2812,9 @@ class XmlChannelTestRead(unittest.TestCase):
         self.failUnlessEqual(result1.__class__, result2.__class__)
         attrs = ["id", "path", "attrs"]
         if isinstance(result1, testresult.TestStepResult):
+            # Loaded values of step arguments are all strings
+            for name, value in result1.args.iteritems():
+                 result1.args[name] = str(value)
             attrs.extend(("func", "args"))
         for attr in attrs:
             self.failUnlessEqual(getattr(result1, attr), getattr(result2, attr))
@@ -2854,12 +2844,12 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def tearDown(self):
         path = self.channel.filePath() or self._xmlFile
-#        if os.path.exists(path):
-#            os.remove(path)
+        if os.path.exists(path):
+            os.remove(path)
 
     def testStartTest1Suite1Case(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1)
+        suites, cases, steps = helpers.structResult(1, 1)
         suite, case = suites[0], cases[0]
         device = self._device()
         self.channel.start(None)
@@ -2875,7 +2865,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartTest1Suite1Case_1Suite1Case1Step(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         device = self._device()
         self.channel.start(None)
@@ -2891,7 +2881,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartStopTest1Suite1Case1StepVerbose(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         device = self._device(status=testexec.STATUS_PASSED, time=5.65)
         self.channel.setVerbose(True)
@@ -2910,7 +2900,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartStopTest1Suite2Cases2StepsVerboseErrors_2Devices(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 2, 1)
+        suites, cases, steps = helpers.structResult(1, 2, 1)
         suite, case1, case2, step1, step2 = suites + cases + steps
         device1 = self._device("Device1", time=5.415,
                                 status=testexec.STATUS_PASSED)
@@ -2941,7 +2931,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartStopTest1Suite1Case1StepCores(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         device = self._device(status=testexec.STATUS_ERROR, time=3.25)
         device.cores = self.cores
@@ -2965,7 +2955,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartStopTest1Suite1Case1StepCoresVerbose(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(1, 1, 1)
+        suites, cases, steps = helpers.structResult(1, 1, 1)
         suite, case, step = suites[0], cases[0], steps[0]
         device = self._device(status=testexec.STATUS_ERROR, time=8.1)
         device.cores = self.cores
@@ -2985,7 +2975,7 @@ class XmlChannelTestRead(unittest.TestCase):
 
     def testStartStopTest2Cases2StepsVerbose(self):
         string = cStringIO.StringIO()
-        suites, cases, steps = _structResult(0, 2, 1)
+        suites, cases, steps = helpers.structResult(0, 2, 1)
         case1, case2, step1, step2 = cases + steps
         device = self._device(status=testexec.STATUS_PASSED, time=1.875)
         self.channel.setVerbose(True)
