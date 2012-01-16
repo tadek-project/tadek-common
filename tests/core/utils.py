@@ -39,7 +39,7 @@ import unittest
 import datetime
 
 from tadek.core.utils import timeToString, timeFromString, runTimeToString, \
-                          _DATE_FORMAT, _TIME_FORMAT, _TIME_DATE_SEPARATOR
+                          DATE_FORMAT, TIME_FORMAT, DATE_TIME_SEPARATOR
 
 __all__ = ["TimeFunctTest"]
 
@@ -47,18 +47,18 @@ __all__ = ["TimeFunctTest"]
 class TimeFunctTest(unittest.TestCase):
     def testtimeToString(self):
         datetime0 = datetime.datetime.now()
-        self.assertEqual(datetime0.strftime(_TIME_DATE_SEPARATOR.join(
-                    (_DATE_FORMAT, _TIME_FORMAT))), timeToString(datetime0))
+        self.assertEqual(datetime0.strftime(DATE_TIME_SEPARATOR.join(
+                    (DATE_FORMAT, TIME_FORMAT))), timeToString(datetime0))
 
     def testtimeToStringNoDate(self):
         time0 = datetime.datetime.now().time()
-        self.assertEqual(time0.strftime(_TIME_DATE_SEPARATOR.join(
-                        (_DATE_FORMAT, _TIME_FORMAT))), timeToString(time0))
+        self.assertEqual(time0.strftime(DATE_TIME_SEPARATOR.join(
+                        (DATE_FORMAT, TIME_FORMAT))), timeToString(time0))
 
     def testtimeToStringNoTime(self):
         date0 = datetime.datetime.now().date()
-        self.assertEqual(date0.strftime(_TIME_DATE_SEPARATOR.join(
-                        (_DATE_FORMAT, _TIME_FORMAT))), timeToString(date0))
+        self.assertEqual(date0.strftime(DATE_TIME_SEPARATOR.join(
+                        (DATE_FORMAT, TIME_FORMAT))), timeToString(date0))
 
     def testtimeToStringWithNone(self):
         self.assertEqual("", timeToString(None))
@@ -66,8 +66,8 @@ class TimeFunctTest(unittest.TestCase):
     def testtimeFromString(self):
         dateTimeStr = "2011-12-21 16:45:08"
         self.assertEqual(datetime.datetime.strptime(dateTimeStr,
-                    _TIME_DATE_SEPARATOR.join((_DATE_FORMAT, _TIME_FORMAT))),
-                                                timeFromString(dateTimeStr))
+                    DATE_TIME_SEPARATOR.join((DATE_FORMAT, TIME_FORMAT))),
+                                             timeFromString(dateTimeStr))
 
     def testtimeFromStringWithNone(self):
         self.assertEqual(None, timeFromString(""))

@@ -37,11 +37,15 @@
 import os
 import re
 import time
-import datetime
+from datetime import datetime
 import xml.etree.cElementTree as etree
 
 import constants
 import config
+
+DATE_FORMAT = "%Y-%m-%d"
+TIME_FORMAT = "%H:%M:%S"
+DATE_TIME_SEPARATOR = ' '
 
 def encode(data, encoding=None):
     '''
@@ -79,11 +83,6 @@ def decode(data, encoding=None):
         return data.decode(encoding, "ignore")
     return unicode(data)
 
-
-_DATE_FORMAT = "%Y-%m-%d"
-_TIME_FORMAT = "%H:%M:%S"
-_TIME_DATE_SEPARATOR = " "
-
 def localTime(stamp=None):
     '''
     Gets a local date in format 'YYYY-MM-DD' and local time in format 'hh:mm:ss'
@@ -95,11 +94,8 @@ def localTime(stamp=None):
     :return: A local date and time
     :rtype: tuple
     '''
-    if stamp:
-        time = datetime.datetime.fromtimestamp(stamp)
-    else:
-        time = datetime.datetime.now()
-    return time.strftime(_DATE_FORMAT), time.strftime(_TIME_FORMAT)
+    dt = datetime.fromtimestamp(stamp) if stamp else datetime.now()
+    return dt.strftime(DATE_FORMAT), dt.strftime(TIME_FORMAT)
 
 def uniqueFile(name):
     '''
@@ -128,7 +124,7 @@ def runTimeToString(runTime):
     :rtype: string
     '''
     parts = []
-    for unit, suffix in zip((3600, 60), ("h", "m")):
+    for unit, suffix in zip((3600, 60), ('h', 'm')):
         n = runTime // unit
         if n > 0:
             parts.append("%d%s" % (n, suffix))
@@ -137,20 +133,19 @@ def runTimeToString(runTime):
         parts.append("%.2fs" % runTime)
     return ' '.join(parts)
 
-def timeToString(timeObj):
+def timeToString(dt):
     '''
     Returns string from time or datetime object.
     If object is None, function returns empty string.
 
-    :param timeObj: Time object to convert
-    :type timeObj: Any compatible with datetime.strftime
+    :param dt: Time object to convert
+    :type dt: datetime.datetime
     :return: String containing time
     :rtype: string
     '''
-    if timeObj is None:
-        return ""
-    return timeObj.strftime(_TIME_DATE_SEPARATOR.join(
-                                                (_DATE_FORMAT, _TIME_FORMAT)))
+    if dt is None:
+        return ''
+    return dt.strftime(DATE_TIME_SEPARATOR.join((DATE_FORMAT, TIME_FORMAT)))
 
 def timeStampFromString(timeStr):
     '''
@@ -164,8 +159,8 @@ def timeStampFromString(timeStr):
     '''
     if not timeStr:
         return None
-    timeObj = timeFromString(timeStr)
-    return time.mktime(timeObj.timetuple()) + timeObj.microsecond / 1000000.0
+    dt = timeFromString(timeStr)
+    return time.mktime(dt.timetuple()) + dt.microsecond / 1000000.0
 
 def timeFromString(timeStr):
     '''
@@ -173,14 +168,14 @@ def timeFromString(timeStr):
     If input is empty, returns None.
 
     :param timeStr: Time string to convert
-    :type timeStr: String
+    :type timeStr: string
     :return: Time object or None
     :rtype: datetime.datetime or None
     '''
     if not timeStr:
         return None
-    return datetime.datetime.strptime(timeStr, _TIME_DATE_SEPARATOR.join(
-                                                (_DATE_FORMAT, _TIME_FORMAT)))
+    return datetime.strptime(timeStr, DATE_TIME_SEPARATOR.join(
+                                                (DATE_FORMAT, TIME_FORMAT)))
 
 def sizeToString(size):
     '''
@@ -196,12 +191,12 @@ def sizeToString(size):
         return ''
     size = float(size)
     val = 0
-    for suffix in ("B", "KB", "MB", "GB"):
+    for suffix in ('B', "KB", "MB", "GB"):
         val = str(int(size)) if suffix == "B" else "%0.2f" % size
         if size < 1024:
             break
         size /= 1024
-    return ' '.join((val, suffix))
+    return ''.join((val, suffix))
 
 def saveXml(element, file, encoding=constants.ENCODING,
             xslt=None, dtd=None, pretty=True):
