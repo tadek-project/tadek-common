@@ -52,6 +52,9 @@ STATUS_PASSED = "Passed"
 STATUS_FAILED = "Failed"
 STATUS_ERROR = "Error"
 
+# Test execution debug mode
+_DEBUG = False
+
 _SYSTEM_DIR = os.path.abspath(os.path.dirname(traceback.__file__))
 _ENGINE_DIR = os.path.abspath(os.path.dirname(engine.__file__))
 
@@ -60,6 +63,8 @@ def _stack(entries, strings):
     Returns a list of strings representing the given stack frame containing
     only relevant entries.
     '''
+    if _DEBUG:
+        return strings
     start = 0
     for entry in entries:
         dirname = os.path.abspath(os.path.dirname(entry[0]))
